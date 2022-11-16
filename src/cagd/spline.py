@@ -63,13 +63,13 @@ class spline:
         assert stop >= 1
         dgr = self.degree
         knts, cps = self.knots, self.control_points
-        self._de_boor_table = [[None for _ in range(len(cps))] for _ in range(len(dgr))]
-        self._de_boor_table[0] = cps
+        _de_boor_table = [[None for _ in range(len(cps))] for _ in range(len(dgr))]
+        _de_boor_table[0] = cps
         for k in range(0, self.degree):
             for i in range(0, len(cps) - k - 1):
                 alpha = (t - knts[i]) / (knts[i + dgr - k] - knts[i])
-                self._de_boor_table[k + 1][i] = (1 - alpha) * self._de_boor_table[k][i] + alpha * self._de_boor_table[k][i + 1]
-        return self._de_boor_table[stop - 1][0]
+                _de_boor_table[k + 1][i] = (1 - alpha) * _de_boor_table[k][i] + alpha * _de_boor_table[k][i + 1]
+        return _de_boor_table[stop - 1][0]
 
     # adjusts the control points such that it represents the same function,
     # but with an added knot
