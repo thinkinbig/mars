@@ -126,7 +126,34 @@ class spline:
     # kts is only used as given knots in the mode: INTERPOLATION_GIVEN_KNOTS
     # returns that spline object
     def interpolate_cubic(mode, points, kts):
-        pass
+        m = len(points)
+        if mode == spline.INTERPOLATION_GIVEN_KNOTS:
+            knts = kts
+        elif mode == spline.INTERPOLATION_EQUIDISTANT:
+            knts = [i for i in range(m)]
+        elif mode == spline.INTERPOLATION_CHORDAL:
+            knts  = [0] * m
+            for i in range(1, m):
+                knts[i] = knts[i - 1] + abs(points[i] - points[i - 1])
+        elif mode == spline.INTERPOLATION_CENTRIPETAL:
+            knts = [0] * m
+            for i in range(1, m):
+                knts[i] = knts[i - 1] + abs(points[i] - points[i - 1]) ** 0.5
+        elif mode == spline.INTERPOLATION_FOLEY:
+            dis = [0] + [abs(points[i] - points[i - 1]) for i in range(1, m)]
+            ang = [0] + [math.atan2(points[i].y - points[i - 1].y, points[i].x - points[i - 1].x) for i in range(1, m)]
+            ang = [min(math.pi - x, math.pi / 2) for x in ang]
+
+            knts = [0] * m
+            for i in range(1, m):
+                knts[i] = knts[i - 1] + dis[i] * (
+                    1 + 3 / 2 * (ang[i - 1] * dis[i - 1]) / (dis[i - 1] + dis[i]) + 3 / 2 * (ang[i] * d[i + 1]) / (d[i + 1] + d[i])
+                )
+
+        else:
+            assert False
+        knts = [knts[0]] * 3 + knts + [knts[-1]] * 3
+        return spline(points, knts, 3)
 
     # generates a spline that interpolates the given points and fulfills the definition
     # of a periodic spline with equidistant knots
