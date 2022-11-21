@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 from cagd.polyline import polyline
 from cagd.spline import spline, knots
 from cagd.vec import vec2

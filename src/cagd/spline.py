@@ -17,6 +17,9 @@ class spline:
     INTERPOLATION_CENTRIPETAL = 3
     INTERPOLATION_FOLEY = 4
 
+    # generates a spline that interpolates the given points using the given mode
+    
+
     def __init__(self, degree):
         assert (degree >= 1)
         self.degree = degree
@@ -62,15 +65,22 @@ class spline:
     def de_boor(self, t, stop):
         assert stop >= 1
         dgr = self.degree
-        knts, cps = self.knots, self.control_points
-        _de_boor_table = [[None for _ in range(len(cps))] for _ in range(len(dgr))]
-        _de_boor_table[0] = cps
-        for k in range(0, self.degree):
-            for i in range(0, len(cps) - k - 1):
-                alpha = (t - knts[i]) / (knts[i + dgr - k] - knts[i])
-                _de_boor_table[k + 1][i] = (1 - alpha) * _de_boor_table[k][i] + alpha * _de_boor_table[k][i + 1]
-        return _de_boor_table[stop - 1][0]
-
+        knts = self.knots
+        cps = self.control_points
+        _de_boor_tables = []
+        _de_boor_tables.append(cps)
+        idx = knts.knot_index(t)
+        for k in range(1, dgr + 1):
+            if k >= stop:
+                break
+            _de_boor_tables.append([None for i in range(len(_de_boor_tables[k - 1]) - 1)])
+            for i in range(len(_de_boor_tables[k])):
+                if knts[idx - dgr + k + i] == knts[idx - dgr + i]:
+                    _de_boor_tables[k][i] = _de_boor_tables[k - 1][i]
+                else:
+                    alpha = (t - knts[idx - dgr + i]) / (knts[idx - dgr + i + k] - knts[idx - dgr + i])
+                    _de_boor_tables[k][i] = (1 - alpha) * _de_boor_tables[k - 1][i] + alpha * _de_boor_tables[k - 1][i + 1]
+        return _de_boor_tables[stop - 1]
     # adjusts the control points such that it represents the same function,
     # but with an added knot
     def insert_knot(self, t):
