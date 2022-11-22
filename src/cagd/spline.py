@@ -26,6 +26,7 @@ class spline:
         self.periodic = False
         self.knots = None
         self.control_points = []
+        self._de_boor_tables = []
         self.color = "black"
 
     # checks if the number of knots, controlpoints and degree define a valid spline
@@ -64,23 +65,25 @@ class spline:
     # returns that column as a list
     def de_boor(self, t, stop):
         assert stop >= 1
-        dgr = self.degree
         knts = self.knots
         cps = self.control_points
-        _de_boor_tables = []
-        _de_boor_tables.append(cps)
+        self._de_boor_tables.append(cps)
         idx = knts.knot_index(t)
-        for k in range(1, dgr + 1):
-            if k >= stop:
-                break
-            _de_boor_tables.append([None for i in range(len(_de_boor_tables[k - 1]) - 1)])
-            for i in range(len(_de_boor_tables[k])):
-                if knts[idx - dgr + k + i] == knts[idx - dgr + i]:
-                    _de_boor_tables[k][i] = _de_boor_tables[k - 1][i]
-                else:
-                    alpha = (t - knts[idx - dgr + i]) / (knts[idx - dgr + i + k] - knts[idx - dgr + i])
-                    _de_boor_tables[k][i] = (1 - alpha) * _de_boor_tables[k - 1][i] + alpha * _de_boor_tables[k - 1][i + 1]
-        return _de_boor_tables[stop - 1]
+        return self.de_boor_recursion(t, stop, idx)
+
+    def de_boor_recursion(self, t, stop, idx):
+        if self._de_boor_tables[stop - 1] is not None:
+            return self._de_boor_tables[stop - 1]
+        else:
+            for k in range(1, self.degree + 1):
+                self._de_boor_tables.append([None for i in range(len(self._de_boor_tables[k - 1]) - 1)])
+                for i in range(len(self._de_boor_tables[k])):
+                    if self.knots[idx - self.degree + k + i] == self.knots[idx - self.degree + i]:
+                        self._de_boor_tables[k][i] = self.de_boor_recursion(self, t, k - 1, idx)[i]
+                    else:
+                        alpha = (t - self.knots[idx - self.degree + i]) / (self.knots[idx - self.degree + i + k] - self.knots[idx - self.degree + i])
+                        self._de_boor_tables[k][i] = (1 - alpha) * self.de_boor_recursion(self, t, k - 1, idx)[i] + alpha * self.de_boor_recursion(self, t, k - 1, idx)[i + 1]
+            return self._de_boor_tables[stop - 1]
     # adjusts the control points such that it represents the same function,
     # but with an added knot
     def insert_knot(self, t):
@@ -348,11 +351,11 @@ class knots:
     def knot_index(self, v):
         if self.knots[0] > v or self.knots[-1] < v:
             return -1
-        # get the index of the knot smaller than v with binary search
+        # binary search
         l, r = 0, len(self.knots) - 1
         while l < r:
             m = (l + r) // 2
-            if self.knots[m] < v:
+            if self.knots[m] <= v:
                 l = m + 1
             else:
                 r = m
