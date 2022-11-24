@@ -21,6 +21,19 @@ def solve_tridiagonal_equation(diag1, diag2, diag3, res):
 #diag1[i], diag2[i] and diag3[i] are located on the same row of A
 def solve_almost_tridiagonal_equation(diag1, diag2, diag3, res):
     assert(len(diag1) == len(diag2) == len(diag3) == len(res))
-    solution = None
+    # tridiagonal matrix algorithm
+    n = len(diag1)
+    solution = [0] * n
+    _diag1 = diag1[:]
+    _diag2 = diag2[:]
+    _diag3 = diag3[:]
+    _res = res[:]
+    _diag3[0] /= _diag2[0]
+    _res[0] /= _diag2[0]
+    for i in range(1, n):
+        _diag3[i] = _diag3[i] / (_diag2[i] - _diag1[i] * _diag3[i - 1])
+        _res[i] = (_res[i] - _diag1[i] * _res[i - 1]) / (_diag2[i] - _diag1[i] * _diag3[i - 1])
+    solution[n - 1] = _res[n - 1]
+    for i in range(n - 2, -1, -1):
+        solution[i] = _res[i] - _diag3[i] * solution[i + 1]
     return solution
-
