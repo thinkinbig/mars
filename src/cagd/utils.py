@@ -9,7 +9,25 @@ from cagd.vec import vec2
 #therefore diag1[i], diag2[i] and diag3[i] are located on the same row of A
 def solve_tridiagonal_equation(diag1, diag2, diag3, res):
     assert(len(diag1) == len(diag2) == len(diag3) == len(res))
-    solution = None
+     assert(len(diag1) == len(diag2) == len(diag3) == len(res))
+    solution = y = alpha = beta = nu =[0 for i in range(len(diag1))];
+    
+    #initialize the first element
+    beta[0] = diag2[0];
+    nu[0] = diag3[0] / diag2[0];
+    #set up the value of three arrays according to the algorithm in assignment
+    for i in range(1,len(diag1)):
+        alpha[i] = diag1[i];
+        beta[i] = diag2[i] - alpha[i] * nu[i - 1];
+        nu[i] = diag3[i] / beta[i];
+    #initialize first element of y
+    y[0] = res[0] / beta[0];
+    for i in range(len(1, diag1)):
+        y[i] = (res[i] - alpha[i] * y[i - 1]) / beta[i]
+    #initialize first element of x
+    solution[len(diag1) - 1] = y[len(diag1) - 1]
+    for i in range(len(diag1) - 2, -1, -1):
+    solution[i] = y[i] - nu[i] * solution[i + 1];
     return solution
      
 
