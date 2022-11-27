@@ -20,14 +20,14 @@ class spline:
     # generates a spline that interpolates the given points using the given mode
     
 
-    def __init__(self, degree):
+    def __init__(self, degree, control_points = [], knots = None, color = "black"):
         assert (degree >= 1)
         self.degree = degree
         self.periodic = False
-        self.knots = None
-        self.control_points = []
+        self.knots = knots
+        self.control_points = control_points
         self._de_boor_tables = []
-        self.color = "black"
+        self.color = color
 
     # checks if the number of knots, controlpoints and degree define a valid spline
     def validate(self):
@@ -143,21 +143,37 @@ class spline:
             for i in range(1, m):
                 knts[i] = knts[i - 1] + abs(points[i] - points[i - 1]) ** 0.5
         elif mode == spline.INTERPOLATION_FOLEY:
-            dis = [0] + [abs(points[i] - points[i - 1]) for i in range(1, m)]
-            ang = [0] + [math.atan2(points[i].y - points[i - 1].y, points[i].x - points[i - 1].x) for i in range(1, m)]
+            dis = [0] + [abs(points[i] - points[i - 1]) for i in range(1, m)] + [0]
+            ang = [0] + [math.atan2(points[i].y - points[i - 1].y, points[i].x - points[i - 1].x) for i in range(1, m)] + [0]
             ang = [min(math.pi - x, math.pi / 2) for x in ang]
-
             knts = [0] * m
             for i in range(1, m):
                 knts[i] = knts[i - 1] + dis[i] * (
-                    1 + 3 / 2 * (ang[i - 1] * dis[i - 1]) / (dis[i - 1] + dis[i]) + 3 / 2 * (ang[i] * d[i + 1]) / (d[i + 1] + d[i])
+                    1 + 3 / 2 * (ang[i - 1] * dis[i - 1]) / (dis[i - 1] + dis[i]) + 3 / 2 * (ang[i] * dis[i + 1]) / (dis[i + 1] + dis[i])
                 )
 
         else:
-            assert False
+            raise ValueError("Invalid interpolation mode")
         knts = [knts[0]] * 3 + knts + [knts[-1]] * 3
-        return spline(points, knts, 3)
+        return spline.interpolate_cubic_given_knots(points, knts)
+    
+    def interpolate_cubic_given_knots(points, knts):
+        assert len(points) == len(knts) - 6
+        m = len(points)
+        alpha = [0] * m
+        beta = [0] * m
+        gamma = [0] * m
+        
+        for i in range(2, m):
+            alpha[i] = (knts[i + 2] - knts[i]) / (knts[i + 3] - knts[i])
+            beta[i] = (knts[i + 2] - knts[i + 1]) / (knts[i + 3] - knts[i + 1])
+            gamma[i] = (knts[i + 2] - knts[i + 1]) / (knts[i + 4] - knts[i + 1])
+        diag1 = [0, -1] + [(1 - beta[i]) * (1 - alpha[i]) for i in range(2, m)] + [-1 + gamma[m - 1], 0]
+        diag2 = [1, 1 + alpha[1]] + [(1 - beta[i]) * alpha[i] + beta[i] * (1 - gamma[i]) for i in range(2, m)] + [2 - gamma[m - 1], 1]
+        diag3 = [0, -alpha[1]] + [(1 - beta[i]) * (1 - alpha[i]) for i in range(2, m)] + [-1 + gamma[m - 1], 0]
 
+        cp = utils.solve_almost_tridiagonal_equation(diag1, diag2, diag3, [0] + [2 * (points[i + 1].x - points[i].x) for i in range(m - 1)] + [0])
+        return spline(degree=3, control_points=cp, knots=knts)
     # generates a spline that interpolates the given points and fulfills the definition
     # of a periodic spline with equidistant knots
     # returns that spline object
