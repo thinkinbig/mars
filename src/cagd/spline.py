@@ -66,9 +66,13 @@ class spline:
     def de_boor(self, t, stop):
         assert stop >= 1
         knts = self.knots
+        assert None not in knts
         cps = self.control_points
         self._de_boor_tables.append(cps)
-        idx = knts.knot_index(t)
+        knoten = knots(len(self.knots))
+        for i in range(0, len(knts)):
+            knoten[i] = knts[i]
+        idx = knoten.knot_index(t)
         return self.de_boor_recursion(t, stop, idx)
 
     def de_boor_recursion(self, t, stop, idx):

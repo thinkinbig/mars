@@ -89,3 +89,6 @@ class vec2:
 
     def __copy__(self):
         return vec2(self.x, self.y)
+
+    def __truediv__(self, other):
+        return vec2(self.x / other, self.y / other)
