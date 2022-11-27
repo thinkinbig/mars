@@ -154,26 +154,24 @@ class spline:
 
         else:
             raise ValueError("Invalid interpolation mode")
-        knts = [knts[0]] * 3 + knts + [knts[-1]] * 3
+        knts = [knts[0]] * 2 + knts + [knts[-1]] * 2
         return spline.interpolate_cubic_given_knots(points, knts)
-    
+
     def interpolate_cubic_given_knots(points, knts):
-        assert len(points) == len(knts) - 6
+        assert len(points) == len(knts) - 4
         m = len(points)
-        alpha = [0] * m
-        beta = [0] * m
-        gamma = [0] * m
-        
+        alpha = beta = gamma = [0] * m
         for i in range(2, m):
             alpha[i] = (knts[i + 2] - knts[i]) / (knts[i + 3] - knts[i])
             beta[i] = (knts[i + 2] - knts[i + 1]) / (knts[i + 3] - knts[i + 1])
             gamma[i] = (knts[i + 2] - knts[i + 1]) / (knts[i + 4] - knts[i + 1])
-        diag1 = [0, -1] + [(1 - beta[i]) * (1 - alpha[i]) for i in range(2, m)] + [-1 + gamma[m - 1], 0]
-        diag2 = [1, 1 + alpha[1]] + [(1 - beta[i]) * alpha[i] + beta[i] * (1 - gamma[i]) for i in range(2, m)] + [2 - gamma[m - 1], 1]
-        diag3 = [0, -alpha[1]] + [(1 - beta[i]) * (1 - alpha[i]) for i in range(2, m)] + [-1 + gamma[m - 1], 0]
+        diag1 = [0, -1] + [(1 - beta[i + 1]) * (1 - alpha[i + 1]) for i in range(2, m - 1)] + [-1 + gamma[-1], 0]
+        diag2 = [1, 1 + alpha[1]] + [alpha[i] * (1 - beta[i]) + beta[i] * (1 - gamma[i]) for i in range(2, m - 1)] + [2 - beta[-1], 1]
+        diag3 = [0, -alpha[1]] + [beta[i - 1] * gamma[i - 1] for i in range(2, m - 1)] + [alpha[-1], 0]
+        res = [points[0], vec2(0, 0)] + [points[i] for i in range(2, m - 1)] + [vec2(0, 0), points[-1]]
+        cps = utils.solve_tridiagonal_equation(diag1, diag2, diag3, res)
+        return spline(degree=3, control_points=cps, knots=copy.deepcopy(knts))
 
-        cp = utils.solve_almost_tridiagonal_equation(diag1, diag2, diag3, [0] + [2 * (points[i + 1].x - points[i].x) for i in range(m - 1)] + [0])
-        return spline(degree=3, control_points=cp, knots=knts)
     # generates a spline that interpolates the given points and fulfills the definition
     # of a periodic spline with equidistant knots
     # returns that spline object
