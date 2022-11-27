@@ -70,8 +70,7 @@ class spline:
         cps = self.control_points
         self._de_boor_tables.append(cps)
         knoten = knots(len(self.knots))
-        for i in range(0, len(knts)):
-            knoten[i] = knts[i]
+        knoten[:] = self.knots[:]
         idx = knoten.knot_index(t)
         return self.de_boor_recursion(t, stop, idx)
 
