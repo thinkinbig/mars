@@ -157,11 +157,11 @@ class spline:
 
         else:
             raise ValueError("Invalid interpolation mode")
-        knts = [knts[0]] * 2 + knts + [knts[-1]] * 2
+        knts = [knts[0]] * 3 + knts + [knts[-1]] * 3
         return spline.interpolate_cubic_given_knots(points, knts)
 
     def interpolate_cubic_given_knots(points, knts):
-        assert len(points) == len(knts) - 4
+        assert len(points) == len(knts) - 6
         m = len(points)
         alpha = beta = gamma = [0] * m
         for i in range(2, m):
@@ -367,13 +367,13 @@ class knots:
 
     def knot_index(self, v):
         if self.knots[0] > v or self.knots[-1] < v:
-            return -1
-        # binary search
+            raise ValueError("knot value out of range")
+        # binary search right most index
         l, r = 0, len(self.knots) - 1
         while l < r:
             m = (l + r) // 2
-            if self.knots[m] <= v:
-                l = m + 1
-            else:
+            if self.knots[m] > v:
                 r = m
-        return l
+            else:
+                l = m + 1
+        return r - 1
