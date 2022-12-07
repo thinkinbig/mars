@@ -54,4 +54,31 @@ def solve_tridiagonal_equation(diag1, diag2, diag3, res):
 #the first element of diag1 and the last element of diag3 represent the top right and bottom left elements of A
 #diag1[i], diag2[i] and diag3[i] are located on the same row of A
 def solve_almost_tridiagonal_equation(diag1, diag2, diag3, res):
-    pass
+    assert(len(diag2) == len(diag3) == len(res) == len(diag1))
+    n = len(diag1)
+    # initialize the array
+    v, y, s, z, t, w = [0] * n, [0] * n, [0] * n, [0] * n, [0] * n, [0] * n
+    solution = [0] * n
+    # initialize the first element
+    v[0], y[0], s[0] = 0, 0, 1
+    # initialize the last element
+    t[-1], w[-1] = 1, 0
+    # copy the original matrix
+    a = diag1[:]
+    b = diag2[:]
+    c = diag3[:]
+    d = res[:]
+    # set up the value of three arrays according to the algorithm in assignment
+    for i in range(1, n):
+        z[i] = 1 / (b[i] + a[i] * v[i - 1])
+        v[i] = -c[i] * z[i]
+        y[i] = (d[i] - a[i] * y[i - 1]) * z[i]
+        s[i] = -s[i - 1] * a[i] * z[i]
+    for i in range(n - 2, -1, -1):
+        t[i] = v[i] * t[i + 1] + s[i]
+        w[i] = v[i] * w[i + 1] + y[i]
+    solution[-1] = (d[-1] - a[-1] * w[-2] - c[-1] * w[0]) / (b[-1] + a[-1] * t[-2] + c[-1] * t[0])
+    for i in range(n - 2, -1, -1):
+        solution[i] = t[i] * solution[-1] + w[i]
+    return solution
+
