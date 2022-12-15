@@ -29,15 +29,31 @@ p = polyline()
 p.points = pts
 p.set_color("red")
 
+q1 = s1.get_polyline_from_control_points()
+q1.set_color("green")
+
+q2 = s2.get_polyline_from_control_points()
+q2.set_color("green")
+
+q3 = s3.get_polyline_from_control_points()
+q3.set_color("green")
+
+q4 = s4.get_polyline_from_control_points()
+q4.set_color("green")
+
 # generate a scene and add elements to it
 sc = scene_2d.scene()
 sc.set_resolution(900)
-sc.add_element(example_spline)
+# sc.add_element(example_spline)
 sc.add_element(p)
 sc.add_element(s1)
+# sc.add_element(q1)
 sc.add_element(s2)
+# sc.add_element(q2)
 sc.add_element(s3)
+# sc.add_element(q3)
 sc.add_element(s4)
+# sc.add_element(q4)
 sc.write_image()  # compose all elements in the scene
 sc.show()  # tries to show the image with a default viewer
 sc.write_to_file("test.png")  # saves the image to a file

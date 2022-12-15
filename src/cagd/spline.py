@@ -23,7 +23,6 @@ class spline:
     def __init__(self, degree, control_points = [], knots = None, color = "black", periodic = False):
         assert (degree >= 1)
         self.degree = degree
-        self.periodic = False
         self.knots = knots
         self.control_points = control_points
         self.color = color
@@ -69,24 +68,13 @@ class spline:
         degree = self.degree
         idx = self.knots.knot_index(t)
         _de_boor_tables = [self.control_points[i] for i in range(idx - degree, idx + 1)]
-        for r in range(degree + 1):
+        for r in range(1, degree + 1):
             for j in range(degree, r - 1, -1):
                 alpha = (t - self.knots[idx - degree + j]) / (self.knots[idx - degree + j + degree - r + 1] - self.knots[idx - degree + j])
                 _de_boor_tables[j] = (1 - alpha) * _de_boor_tables[j - 1] + alpha * _de_boor_tables[j]
             if degree - r + 1 == stop:
-                return _de_boor_tables[r:-1]
+                return _de_boor_tables[r:]
         
-    def de_boor_recursion(self, t, stop, idx, _de_boor_tables):
-        for k in range(1, self.degree + 1):
-            _de_boor_tables.append([None for i in range(len(_de_boor_tables[k - 1]) - 1)])
-            for i in range(len(_de_boor_tables[k])):
-                if self.knots[idx - self.degree + k + i] == self.knots[idx - self.degree + i]:
-                    _de_boor_tables[k][i] = _de_boor_tables[k - 1][i]
-                else:
-                    alpha = (t - self.knots[idx - self.degree + i]) / (self.knots[idx - self.degree + i + k] - self.knots[idx - self.degree + i])
-                    _de_boor_tables[k][i] = (1 - alpha) * _de_boor_tables[k - 1][i] + alpha * _de_boor_tables[k - 1][i + 1]
-        cps_length = len(_de_boor_tables[0])
-        return _de_boor_tables[cps_length - stop]
     # adjusts the control points such that it represents the same function,
     # but with an added knot
     def insert_knot(self, t):
@@ -163,18 +151,20 @@ class spline:
 
     def interpolate_cubic_given_knots(points, knts):
         assert len(points) == len(knts) - 6
-        m = len(points)
-        alpha = beta = gamma = [0] * m
-        for i in range(2, m):
+        m = len(points) - 1
+        alpha = [0] * (m + 1)
+        beta = [0] * (m + 1)
+        gamma = [0] * (m + 1)
+        zero = points[0] * 0
+        for i in range(2, m + 1):
             alpha[i] = (knts[i + 2] - knts[i]) / (knts[i + 3] - knts[i])
             beta[i] = (knts[i + 2] - knts[i + 1]) / (knts[i + 3] - knts[i + 1])
             gamma[i] = (knts[i + 2] - knts[i + 1]) / (knts[i + 4] - knts[i + 1])
-        diag1 = [0, -1] + [(1 - beta[i + 1]) * (1 - alpha[i + 1]) for i in range(2, m - 1)] + [-1 + gamma[-1], 0]
-        diag2 = [1, 1 + alpha[1]] + [alpha[i] * (1 - beta[i]) + beta[i] * (1 - gamma[i]) for i in range(2, m - 1)] + [2 - beta[-1], 1]
-        diag3 = [0, -alpha[1]] + [beta[i - 1] * gamma[i - 1] for i in range(2, m - 1)] + [alpha[-1], 0]
-        res = [points[0], vec2(0, 0)] + [points[i] for i in range(2, m - 1)] + [vec2(0, 0), points[-1]]
+        diag1 = [0, -1] + [(1 - beta[i]) * (1 - alpha[i]) for i in range(2, m + 1)] + [-1 + gamma[-1], 0]
+        diag2 = [1, 1 + alpha[2]] + [alpha[i] * (1 - beta[i]) + beta[i] * (1 - gamma[i]) for i in range(2, m + 1)] + [2 - gamma[-1], 1]
+        diag3 = [0, -alpha[2]] + [beta[i] * gamma[i] for i in range(2, m + 1)] + [-1, 0]
+        res = [points[0], zero] + [points[i] for i in range(1, m)] + [zero, points[-1]]
         cps = utils.solve_tridiagonal_equation(diag1, diag2, diag3, res)
-        cps = cps[1:]
         return spline(degree=3, control_points=cps, knots=copy.deepcopy(knts))
 
     # generates a spline that interpolates the given points and fulfills the definition
