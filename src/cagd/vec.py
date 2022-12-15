@@ -51,6 +51,11 @@ class vec2:
         self.x = a
         self.y = b
     
+    
+    @staticmethod
+    def zero():
+        return vec2(0,0)
+    
     def __str__(self):
         return "(" + str(self.x) + "," + str(self.y) + ")"
 

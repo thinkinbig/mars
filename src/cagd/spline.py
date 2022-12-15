@@ -20,14 +20,14 @@ class spline:
     # generates a spline that interpolates the given points using the given mode
     
 
-    def __init__(self, degree, control_points = [], knots = None, color = "black"):
+    def __init__(self, degree, control_points = [], knots = None, color = "black", periodic = False):
         assert (degree >= 1)
         self.degree = degree
         self.periodic = False
         self.knots = knots
         self.control_points = control_points
-        self._de_boor_tables = []
         self.color = color
+        self.periodic = periodic
 
     # checks if the number of knots, controlpoints and degree define a valid spline
     def validate(self):
@@ -65,28 +65,28 @@ class spline:
     # returns that column as a list
     def de_boor(self, t, stop):
         assert stop >= 1
-        knts = self.knots
-        assert None not in knts
-        cps = self.control_points
-        self._de_boor_tables.append(cps)
-        knoten = knots(len(self.knots))
-        knoten[:] = self.knots[:]
-        idx = knoten.knot_index(t)
-        return self.de_boor_recursion(t, stop, idx)
-
-    def de_boor_recursion(self, t, stop, idx):
-        if self._de_boor_tables[stop - 1] is not None:
-            return self._de_boor_tables[stop - 1]
-        else:
-            for k in range(1, self.degree + 1):
-                self._de_boor_tables.append([None for i in range(len(self._de_boor_tables[k - 1]) - 1)])
-                for i in range(len(self._de_boor_tables[k])):
-                    if self.knots[idx - self.degree + k + i] == self.knots[idx - self.degree + i]:
-                        self._de_boor_tables[k][i] = self.de_boor_recursion(self, t, k - 1, idx)[i]
-                    else:
-                        alpha = (t - self.knots[idx - self.degree + i]) / (self.knots[idx - self.degree + i + k] - self.knots[idx - self.degree + i])
-                        self._de_boor_tables[k][i] = (1 - alpha) * self.de_boor_recursion(self, t, k - 1, idx)[i] + alpha * self.de_boor_recursion(self, t, k - 1, idx)[i + 1]
-            return self._de_boor_tables[stop - 1]
+        assert None not in self.knots
+        degree = self.degree
+        idx = self.knots.knot_index(t)
+        _de_boor_tables = [self.control_points[i] for i in range(idx - degree, idx + 1)]
+        for r in range(degree + 1):
+            for j in range(degree, r - 1, -1):
+                alpha = (t - self.knots[idx - degree + j]) / (self.knots[idx - degree + j + degree - r + 1] - self.knots[idx - degree + j])
+                _de_boor_tables[j] = (1 - alpha) * _de_boor_tables[j - 1] + alpha * _de_boor_tables[j]
+            if degree - r + 1 == stop:
+                return _de_boor_tables[r:-1]
+        
+    def de_boor_recursion(self, t, stop, idx, _de_boor_tables):
+        for k in range(1, self.degree + 1):
+            _de_boor_tables.append([None for i in range(len(_de_boor_tables[k - 1]) - 1)])
+            for i in range(len(_de_boor_tables[k])):
+                if self.knots[idx - self.degree + k + i] == self.knots[idx - self.degree + i]:
+                    _de_boor_tables[k][i] = _de_boor_tables[k - 1][i]
+                else:
+                    alpha = (t - self.knots[idx - self.degree + i]) / (self.knots[idx - self.degree + i + k] - self.knots[idx - self.degree + i])
+                    _de_boor_tables[k][i] = (1 - alpha) * _de_boor_tables[k - 1][i] + alpha * _de_boor_tables[k - 1][i + 1]
+        cps_length = len(_de_boor_tables[0])
+        return _de_boor_tables[cps_length - stop]
     # adjusts the control points such that it represents the same function,
     # but with an added knot
     def insert_knot(self, t):
@@ -157,8 +157,9 @@ class spline:
 
         else:
             raise ValueError("Invalid interpolation mode")
-        knts = [knts[0]] * 3 + knts + [knts[-1]] * 3
-        return spline.interpolate_cubic_given_knots(points, knts)
+        knoten = knots(6 + len(knts))
+        knoten.knots = [knts[0]] * 3 + knts + [knts[-1]] * 3
+        return spline.interpolate_cubic_given_knots(points, knoten)
 
     def interpolate_cubic_given_knots(points, knts):
         assert len(points) == len(knts) - 6
@@ -173,13 +174,20 @@ class spline:
         diag3 = [0, -alpha[1]] + [beta[i - 1] * gamma[i - 1] for i in range(2, m - 1)] + [alpha[-1], 0]
         res = [points[0], vec2(0, 0)] + [points[i] for i in range(2, m - 1)] + [vec2(0, 0), points[-1]]
         cps = utils.solve_tridiagonal_equation(diag1, diag2, diag3, res)
+        cps = cps[1:]
         return spline(degree=3, control_points=cps, knots=copy.deepcopy(knts))
 
     # generates a spline that interpolates the given points and fulfills the definition
     # of a periodic spline with equidistant knots
     # returns that spline object
     def interpolate_cubic_periodic(points):
-        pass
+        n = len(points)
+        diag1 = [1/6] * n
+        diag2 = [2/3] * n
+        diag3 = [1/6] * n
+        cps = utils.solve_almost_tridiagonal_equation(diag1, diag2, diag3, points)
+        knts = [i for i in range(n + 1)]
+        return spline(degree=3, control_points=cps, knots=copy.deepcopy(knts), periodic=True)
 
     # for splines of degree 3, generate a parallel spline with distance dist
     # the returned spline is off from the exact parallel by at most eps

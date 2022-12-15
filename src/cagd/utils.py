@@ -31,7 +31,7 @@ def solve_tridiagonal_equation(diag1, diag2, diag3, res):
     assert(len(diag1) == len(diag2) == len(diag3) == len(res))
     # tridiagonal matrix algorithm
     n = len(diag1)
-    solution = [0] * n
+    solution = [res[0] * 0] * n
     # copy the original matrix
     _diag1 = diag1[:]
     _diag2 = diag2[:]
@@ -56,13 +56,15 @@ def solve_tridiagonal_equation(diag1, diag2, diag3, res):
 def solve_almost_tridiagonal_equation(diag1, diag2, diag3, res):
     assert(len(diag2) == len(diag3) == len(res) == len(diag1))
     n = len(diag1)
+    # zero vector
     # initialize the array
-    v, y, s, z, t, w = [0] * n, [0] * n, [0] * n, [0] * n, [0] * n, [0] * n
-    solution = [0] * n
+    v, s, z, t = [0] * n, [0] * n, [0] * n, [0] * n
+    # unify the vector with result
+    y, w, solution = [res[0] * 0] * n, [res[0] * 0] * n, [res[0] * 0] * n
     # initialize the first element
-    v[0], y[0], s[0] = 0, 0, 1
+    v[0], s[0] = 0, 1
     # initialize the last element
-    t[-1], w[-1] = 1, 0
+    t[-1] = 1
     # copy the original matrix
     a = diag1[:]
     b = diag2[:]
