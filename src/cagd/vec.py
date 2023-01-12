@@ -56,6 +56,9 @@ class vec2:
     def zero():
         return vec2(0,0)
     
+    def rotate_90(self):
+        return vec2(-self.y, self.x)
+    
     def __str__(self):
         return "(" + str(self.x) + "," + str(self.y) + ")"
 

@@ -79,8 +79,8 @@ def solve_almost_tridiagonal_equation(diag1, diag2, diag3, res):
     for i in range(n - 2, -1, -1):
         t[i] = v[i] * t[i + 1] + s[i]
         w[i] = v[i] * w[i + 1] + y[i]
-    solution[-1] = (d[-1] - a[-1] * w[-2] - c[-1] * w[0]) / (b[-1] + a[-1] * t[-2] + c[-1] * t[0])
+    solution[n - 1] = (d[n - 1] - a[n - 1] * w[-2] - c[n - 1] * w[0]) / (b[n - 1] + a[n - 1] * t[n - 2] + c[n - 1] * t[0])
     for i in range(n - 2, -1, -1):
-        solution[i] = t[i] * solution[-1] + w[i]
+        solution[i] = t[i] * solution[n - 1] + w[i]
     return solution
 

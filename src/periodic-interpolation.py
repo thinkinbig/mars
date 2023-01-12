@@ -42,12 +42,14 @@ sc = scene.scene()
 sc.set_resolution(900)
 sc.add_element(s)
 sc.add_element(p)
+sc.add_element(pts_line)
 
 #generate a spline that approximates the unit circle
-n = 8
-circle_pts = unit_circle_points(n)
-circle = spline.interpolate_cubic_periodic(points=circle_pts)
-sc.add_element(circle)
-calculate_circle_deviation(circle)
+# n = 8
+# circle_pts = unit_circle_points(n)
+# circle = spline.interpolate_cubic_periodic(points=circle_pts)
+# sc.add_element(circle)
+# calculate_circle_deviation(circle)
 sc.write_image()
 sc.show()
+

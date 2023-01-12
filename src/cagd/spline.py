@@ -50,8 +50,11 @@ class spline:
     def __call__(self, t):
         return self.evaluate(t)
 
+    # calculate the tangent at a given value t in unit
     def tangent(self, t):
-        pass
+        tan_endpoints = self.de_boor(t, 2)
+        v = tan_endpoints[1] - tan_endpoints[0]
+        return v / abs(v)
 
     def get_color(self):
         return self.color
@@ -74,11 +77,19 @@ class spline:
                 _de_boor_tables[j] = (1 - alpha) * _de_boor_tables[j - 1] + alpha * _de_boor_tables[j]
             if degree - r + 1 == stop:
                 return _de_boor_tables[r:]
-        
+
     # adjusts the control points such that it represents the same function,
     # but with an added knot
     def insert_knot(self, t):
-        pass
+        assert len(self.control_points) >= self.degree - 1
+        knots = self.knots
+        self.knots.insert(t)
+        idx = knots.knot_index(t)
+        # get related control points
+        start_index, end_index = idx - self.degree, idx + 1
+        insertions_cps = self.de_boor(t, self.degree)
+        self.control_points = self.control_points[:start_index] + insertions_cps + self.control_points[end_index:]
+
 
     def get_axis_aligned_bounding_box(self):
         min_vec = copy.copy(self.control_points[0])
@@ -176,8 +187,16 @@ class spline:
         diag2 = [2/3] * n
         diag3 = [1/6] * n
         cps = utils.solve_almost_tridiagonal_equation(diag1, diag2, diag3, points)
-        knts = [i for i in range(n + 1)]
-        return spline(degree=3, control_points=cps, knots=copy.deepcopy(knts), periodic=True)
+        knts = [i for i in range(n)]
+        knoten = knots(len(knts))
+        knoten[:] = knts
+        return spline(degree=3, control_points=cps, knots=knoten, periodic=True)
+
+    def _translate_point_in_spline(self, t, d):
+        p_i = self.evaluate(t)
+        norm_t = self.tangent(t)
+        norm = norm_t.rotate_90()
+        return p_i + norm * d
 
     # for splines of degree 3, generate a parallel spline with distance dist
     # the returned spline is off from the exact parallel by at most eps
@@ -185,9 +204,15 @@ class spline:
         assert (self.degree == 3)
         if dist == 0:
             return self
-
-        para_spline = None
+        
+        # # copy spline and its parameters
+        # _spline = spline(self.degree, self.control_points, self.knots, self.periodic)
+        
+        para_points = [self._translate_point_in_spline(t, dist) for t in self.knots]
+        para_spline = spline.interpolate_cubic_given_knots(self.knots, para_points)
         return para_spline
+    
+
 
     # generates a rotational surface by rotating the spline around the z axis
     # the spline is assumed to be on the xz-plane
