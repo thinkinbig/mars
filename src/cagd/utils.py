@@ -56,31 +56,32 @@ def solve_tridiagonal_equation(diag1, diag2, diag3, res):
 def solve_almost_tridiagonal_equation(diag1, diag2, diag3, res):
     assert(len(diag2) == len(diag3) == len(res) == len(diag1))
     n = len(diag1)
-    # zero vector
     # initialize the array
-    v, s, z, t = [0] * n, [0] * n, [0] * n, [0] * n
+    v, s, z = [0] * n, [0] * n, [0] * n
     # unify the vector with result
-    y, w, solution = [res[0] * 0] * n, [res[0] * 0] * n, [res[0] * 0] * n
+    y, solution = [res[0] * 0] * n, [res[0] * 0] * n
+    t, w = [0] * (n + 1), [res[0] * 0] * (n + 1)
     # initialize the first element
     v[0], s[0] = 0, 1
     # initialize the last element
     t[-1] = 1
     # copy the original matrix
-    a = diag1[:]
-    b = diag2[:]
-    c = diag3[:]
-    d = res[:]
+    a = [0] + diag1
+    b = [0] + diag2
+    c = [0] + diag3
+    d = [res[0] * 0] + res
+
     # set up the value of three arrays according to the algorithm in assignment
     for i in range(1, n):
         z[i] = 1 / (b[i] + a[i] * v[i - 1])
         v[i] = -c[i] * z[i]
         y[i] = (d[i] - a[i] * y[i - 1]) * z[i]
         s[i] = -s[i - 1] * a[i] * z[i]
-    for i in range(n - 2, -1, -1):
+    for i in range(n - 1, 0, -1):
         t[i] = v[i] * t[i + 1] + s[i]
         w[i] = v[i] * w[i + 1] + y[i]
-    solution[n - 1] = (d[n - 1] - a[n - 1] * w[-2] - c[n - 1] * w[0]) / (b[n - 1] + a[n - 1] * t[n - 2] + c[n - 1] * t[0])
-    for i in range(n - 2, -1, -1):
-        solution[i] = t[i] * solution[n - 1] + w[i]
-    return solution
+    solution[n - 1] = (d[n] - c[n] * w[1] - a[n] * w[n - 1]) * (1 / (c[n] * t[1] + a[n] * t[n - 1] + b[n]))
+    for k in range(n - 1, 0, -1):
+        solution[k - 1] = t[k] * solution[n - 1] + w[k]
 
+    return solution

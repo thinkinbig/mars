@@ -205,11 +205,38 @@ class spline:
         if dist == 0:
             return self
         
-        # # copy spline and its parameters
-        # _spline = spline(self.degree, self.control_points, self.knots, self.periodic)
+        # copy spline and its parameters
+        _spline = spline(self.degree, self.control_points, self.knots, self.periodic)
         
-        para_points = [self._translate_point_in_spline(t, dist) for t in self.knots]
-        para_spline = spline.interpolate_cubic_given_knots(self.knots, para_points)
+        para_points = [_spline._translate_point_in_spline(t, dist) for t in _spline.knots]
+        para_spline = spline.interpolate_cubic_given_knots(_spline.knots, para_points)
+        
+        def _insert_knotes_recursive(start_knote, end_knote, para_start_knote, para_end_knote, eps):
+            middle_knote = (start_knote + end_knote) // 2
+            para_middle_knote = (para_start_knote + para_end_knote) // 2
+            value1 = _spline.evaluate(middle_knote)
+            value2 = para_spline.evaluate(para_middle_knote)
+            distance = abs(value1 - value2)
+            if distance > eps:
+                _spline.insert_knot(middle_knote)
+                para_spline.insert_knot(para_middle_knote)
+                _insert_knotes_recursive(start_knote,
+                                         middle_knote,
+                                         para_start_knote,
+                                         para_middle_knote,
+                                         eps)
+                # _insert_knotes_recursive(middle_knote,
+                #                          end_knote,
+                #                          para_middle_knote,
+                #                          para_end_knote,
+                #                          eps)
+        
+        for i in range(len(_spline.knots) - 1):
+            _insert_knotes_recursive(_spline.knots[i],
+                                     _spline.knots[i + 1],
+                                     para_spline.knots[i],
+                                     para_spline.knots[i + 1],
+                                     eps)
         return para_spline
     
 
