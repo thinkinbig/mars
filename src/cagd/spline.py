@@ -214,6 +214,7 @@ class spline:
         para_spline = spline.interpolate_cubic_given_knots(para_points, _spline.knots)
         def _insert_knotes_recursive(start_knote, end_knote, para_start_knote, para_end_knote, eps):
             # NOTE: this code is problematic, cause once the knot is inserted, control points should also be reevalutated.
+            # Otherwise it will cause index out of range error.
             middle_knote = (start_knote + end_knote) // 2
             para_middle_knote = (para_start_knote + para_end_knote) // 2
             value1 = _spline.evaluate(middle_knote)
@@ -417,24 +418,24 @@ class knots:
         self.knots.insert(i, t)
 
     def knot_index(self, v):
-        # if self.knots[0] > v or self.knots[-1] < v:
-        #     raise ValueError("knot value out of range")
-        # # binary search right most index
-        # l, r = 0, len(self.knots) - 1
-        # while l < r:
-        #     m = (l + r) // 2
-        #     if self.knots[m] > v:
-        #         r = m
-        #     else:
-        #         l = m + 1
-        # return r - 1
-        invalid_index = -1
-        if self.knots[0] > v:
-            return invalid_index  # unexpected!
-        index = invalid_index
-        for t_i in self.knots:
-            if t_i <= v:
-                index += 1
+        if self.knots[0] > v or self.knots[-1] < v:
+            raise ValueError("knot value out of range")
+        # binary search right most index
+        l, r = 0, len(self.knots) - 1
+        while l < r:
+            m = (l + r) // 2
+            if self.knots[m] > v:
+                r = m
             else:
-                return index
-        return invalid_index
+                l = m + 1
+        return r - 1
+        # invalid_index = -1
+        # if self.knots[0] > v:
+        #     return invalid_index  # unexpected!
+        # index = invalid_index
+        # for t_i in self.knots:
+        #     if t_i <= v:
+        #         index += 1
+        #     else:
+        #         return index
+        # return invalid_index
