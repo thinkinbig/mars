@@ -70,11 +70,15 @@ class spline:
         assert None not in self.knots
         degree = self.degree
         idx = self.knots.knot_index(t)
-        _de_boor_tables = [self.control_points[i] for i in range(idx - degree, idx + 1)]
+        print("idx: ", idx)
+        _de_boor_tables = [self.control_points[i + idx - degree] for i in range(0, degree + 1)]
         for r in range(1, degree + 1):
             for j in range(degree, r - 1, -1):
-                alpha = (t - self.knots[idx - degree + j]) / (self.knots[idx - degree + j + degree - r + 1] - self.knots[idx - degree + j])
-                _de_boor_tables[j] = (1 - alpha) * _de_boor_tables[j - 1] + alpha * _de_boor_tables[j]
+                if self.knots[idx - degree + j + degree - r + 1] == self.knots[idx - degree + j]:
+                    _de_boor_tables[j] = _de_boor_tables[j - 1]
+                else:
+                    alpha = (t - self.knots[idx - degree + j]) / (self.knots[idx - degree + j + degree - r + 1] - self.knots[idx - degree + j])
+                    _de_boor_tables[j] = (1 - alpha) * _de_boor_tables[j - 1] + alpha * _de_boor_tables[j]
             if degree - r + 1 == stop:
                 return _de_boor_tables[r:]
 
@@ -95,7 +99,6 @@ class spline:
         min_vec = copy.copy(self.control_points[0])
         max_vec = copy.copy(self.control_points[0])
         for p in self.control_points:
-            # print("comparing {0} to {1} and {2}".format(p, min_vec, max_vec))
             if p.x < min_vec.x:
                 min_vec.x = p.x
             if p.y < min_vec.y:
@@ -204,14 +207,13 @@ class spline:
         assert (self.degree == 3)
         if dist == 0:
             return self
-        
         # copy spline and its parameters
         _spline = spline(self.degree, self.control_points, self.knots, self.periodic)
-        
-        para_points = [_spline._translate_point_in_spline(t, dist) for t in _spline.knots]
-        para_spline = spline.interpolate_cubic_given_knots(_spline.knots, para_points)
-        
+        start, end = self.degree, len(self.knots) - self.degree
+        para_points = [_spline._translate_point_in_spline(_spline.knots[i], dist) for i in range(start, end)]
+        para_spline = spline.interpolate_cubic_given_knots(para_points, _spline.knots)
         def _insert_knotes_recursive(start_knote, end_knote, para_start_knote, para_end_knote, eps):
+            # NOTE: this code is problematic, cause once the knot is inserted, control points should also be reevalutated.
             middle_knote = (start_knote + end_knote) // 2
             para_middle_knote = (para_start_knote + para_end_knote) // 2
             value1 = _spline.evaluate(middle_knote)
@@ -230,7 +232,6 @@ class spline:
                 #                          para_middle_knote,
                 #                          para_end_knote,
                 #                          eps)
-        
         for i in range(len(_spline.knots) - 1):
             _insert_knotes_recursive(_spline.knots[i],
                                      _spline.knots[i + 1],
@@ -416,14 +417,24 @@ class knots:
         self.knots.insert(i, t)
 
     def knot_index(self, v):
-        if self.knots[0] > v or self.knots[-1] < v:
-            raise ValueError("knot value out of range")
-        # binary search right most index
-        l, r = 0, len(self.knots) - 1
-        while l < r:
-            m = (l + r) // 2
-            if self.knots[m] > v:
-                r = m
+        # if self.knots[0] > v or self.knots[-1] < v:
+        #     raise ValueError("knot value out of range")
+        # # binary search right most index
+        # l, r = 0, len(self.knots) - 1
+        # while l < r:
+        #     m = (l + r) // 2
+        #     if self.knots[m] > v:
+        #         r = m
+        #     else:
+        #         l = m + 1
+        # return r - 1
+        invalid_index = -1
+        if self.knots[0] > v:
+            return invalid_index  # unexpected!
+        index = invalid_index
+        for t_i in self.knots:
+            if t_i <= v:
+                index += 1
             else:
-                l = m + 1
-        return r - 1
+                return index
+        return invalid_index
