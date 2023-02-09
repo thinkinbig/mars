@@ -79,7 +79,7 @@ class vec2:
 
     def __ne__(self, other):
         return not self == other
-    
+
     def __neg__(self):
         return -1 * self
 
@@ -100,3 +100,6 @@ class vec2:
 
     def __truediv__(self, other):
         return vec2(self.x / other, self.y / other)
+
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y

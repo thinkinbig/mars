@@ -53,8 +53,7 @@ class spline:
     # calculate the tangent at a given value t in unit
     def tangent(self, t):
         tan_endpoints = self.de_boor(t, 2)
-        v = tan_endpoints[1] - tan_endpoints[0]
-        return v / abs(v)
+        return tan_endpoints[1] - tan_endpoints[0]
 
     def get_color(self):
         return self.color
@@ -70,7 +69,6 @@ class spline:
         assert None not in self.knots
         degree = self.degree
         idx = self.knots.knot_index(t)
-        print("idx: ", idx)
         _de_boor_tables = [self.control_points[i + idx - degree] for i in range(0, degree + 1)]
         for r in range(1, degree + 1):
             for j in range(degree, r - 1, -1):
@@ -195,10 +193,11 @@ class spline:
         knoten[:] = knts
         return spline(degree=3, control_points=cps, knots=knoten, periodic=True)
 
-    def _translate_point_in_spline(self, t, d):
-        p_i = self.evaluate(t)
-        norm_t = self.tangent(t)
-        norm = norm_t.rotate_90()
+    def _translate_point_in_spline(self, idx, d):
+        p_i = self.evaluate(self.knots[idx])
+        norm_t = self.tangent(self.knots[idx])
+        normalized = norm_t / sqrt(norm_t.dot(norm_t))
+        norm = normalized.rotate_90()
         return p_i + norm * d
 
     # for splines of degree 3, generate a parallel spline with distance dist
@@ -210,36 +209,38 @@ class spline:
         # copy spline and its parameters
         _spline = spline(self.degree, self.control_points, self.knots, self.periodic)
         start, end = self.degree, len(self.knots) - self.degree
-        para_points = [_spline._translate_point_in_spline(_spline.knots[i], dist) for i in range(start, end)]
-        para_spline = spline.interpolate_cubic_given_knots(para_points, _spline.knots)
-        def _insert_knotes_recursive(start_knote, end_knote, para_start_knote, para_end_knote, eps):
-            # NOTE: this code is problematic, cause once the knot is inserted, control points should also be reevalutated.
-            # Otherwise it will cause index out of range error.
-            middle_knote = (start_knote + end_knote) // 2
-            para_middle_knote = (para_start_knote + para_end_knote) // 2
-            value1 = _spline.evaluate(middle_knote)
-            value2 = para_spline.evaluate(para_middle_knote)
-            distance = abs(value1 - value2)
-            if distance > eps:
-                _spline.insert_knot(middle_knote)
-                para_spline.insert_knot(para_middle_knote)
-                _insert_knotes_recursive(start_knote,
-                                         middle_knote,
-                                         para_start_knote,
-                                         para_middle_knote,
-                                         eps)
-                # _insert_knotes_recursive(middle_knote,
-                #                          end_knote,
-                #                          para_middle_knote,
-                #                          para_end_knote,
-                #                          eps)
-        for i in range(len(_spline.knots) - 1):
-            _insert_knotes_recursive(_spline.knots[i],
-                                     _spline.knots[i + 1],
-                                     para_spline.knots[i],
-                                     para_spline.knots[i + 1],
-                                     eps)
-        return para_spline
+        para_points = []
+        for i in range(start, end):
+            result = _spline._translate_point_in_spline(i, dist)
+            para_points.append(result)
+        # def _insert_knotes_recursive(start_knote, end_knote, para_start_knote, para_end_knote, eps):
+        #     # NOTE: this code is problematic, cause once the knot is inserted, control points should also be reevalutated.
+        #     # Otherwise it will cause index out of range error.
+        #     middle_knote = (start_knote + end_knote) // 2
+        #     para_middle_knote = (para_start_knote + para_end_knote) // 2
+        #     value1 = _spline.evaluate(middle_knote)
+        #     value2 = para_spline.evaluate(para_middle_knote)
+        #     distance = abs(value1 - value2)
+        #     if distance > eps:
+        #         _spline.insert_knot(middle_knote)
+        #         para_spline.insert_knot(para_middle_knote)
+        #         _insert_knotes_recursive(start_knote,
+        #                                  middle_knote,
+        #                                  para_start_knote,
+        #                                  para_middle_knote,
+        #                                  eps)
+        #         # _insert_knotes_recursive(middle_knote,
+        #         #                          end_knote,
+        #         #                          para_middle_knote,
+        #         #                          para_end_knote,
+        #         #                          eps)
+        # for i in range(len(_spline.knots) - 1):
+        #     _insert_knotes_recursive(_spline.knots[i],
+        #                              _spline.knots[i + 1],
+        #                              para_spline.knots[i],
+        #                              para_spline.knots[i + 1],
+        #                              eps)
+        # return para_spline
     
 
 
@@ -248,7 +249,24 @@ class spline:
     # num_samples refers to the number of interpolation points in the rotational direction
     # returns a spline surface object in three dimensions
     def generate_rotation_surface(self, num_samples):
-        pass
+        surface_degree = (self.degree, 3)
+        s_surface = spline_surface(surface_degree)
+        knots_spline = copy.deepcopy(self.knots)
+        knot_dist = math.pi / num_samples
+        s_surface.periodic = (self.periodic, True)
+        s_surface_cps = []
+        for c_i in self.control_points:
+            x_i = c_i.x
+            z_i = c_i.y
+            cps_i = []
+            for j in range(num_samples):
+                cp = vec3(x_i * cos(2 * pi * j / num_samples), x_i * sin(2 * pi * j / num_samples), z_i)
+                cps_i.append(cp)
+            spline_rot = spline.interpolate_cubic_periodic(cps_i)
+            s_surface_cps.append(spline_rot.control_points)
+        s_surface.control_points = s_surface_cps
+        s_surface.knots = (knots_spline, spline_rot.knots)
+        return s_surface
 
 
 class spline_surface:
