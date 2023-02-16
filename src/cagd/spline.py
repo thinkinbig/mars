@@ -1,5 +1,6 @@
 #! /usr/bin/python
 
+from collections import Counter
 import math
 from cagd.vec import vec2, vec3
 from cagd.polyline import polyline
@@ -72,11 +73,9 @@ class spline:
         _de_boor_tables = [self.control_points[i + idx - degree] for i in range(0, degree + 1)]
         for r in range(1, degree + 1):
             for j in range(degree, r - 1, -1):
-                if self.knots[idx - degree + j + degree - r + 1] == self.knots[idx - degree + j]:
-                    _de_boor_tables[j] = _de_boor_tables[j - 1]
-                else:
-                    alpha = (t - self.knots[idx - degree + j]) / (self.knots[idx - degree + j + degree - r + 1] - self.knots[idx - degree + j])
-                    _de_boor_tables[j] = (1 - alpha) * _de_boor_tables[j - 1] + alpha * _de_boor_tables[j]
+                assert self.knots[idx - degree + j + degree - r + 1] != self.knots[idx - degree + j]
+                alpha = (t - self.knots[idx - degree + j]) / (self.knots[idx - degree + j + degree - r + 1] - self.knots[idx - degree + j])
+                _de_boor_tables[j] = (1 - alpha) * _de_boor_tables[j - 1] + alpha * _de_boor_tables[j]
             if degree - r + 1 == stop:
                 return _de_boor_tables[r:]
 
@@ -194,8 +193,9 @@ class spline:
         return spline(degree=3, control_points=cps, knots=knoten, periodic=True)
 
     def _translate_point_in_spline(self, idx, d):
-        p_i = self.evaluate(self.knots[idx])
-        norm_t = self.tangent(self.knots[idx])
+        knote = self.knots[idx]
+        p_i = self(knote)
+        norm_t = self.tangent(knote)
         normalized = norm_t / sqrt(norm_t.dot(norm_t))
         norm = normalized.rotate_90()
         return p_i + norm * d
@@ -207,40 +207,10 @@ class spline:
         if dist == 0:
             return self
         # copy spline and its parameters
-        _spline = spline(self.degree, self.control_points, self.knots, self.periodic)
         start, end = self.degree, len(self.knots) - self.degree
-        para_points = []
-        for i in range(start, end):
-            result = _spline._translate_point_in_spline(i, dist)
-            para_points.append(result)
-        # def _insert_knotes_recursive(start_knote, end_knote, para_start_knote, para_end_knote, eps):
-        #     # NOTE: this code is problematic, cause once the knot is inserted, control points should also be reevalutated.
-        #     # Otherwise it will cause index out of range error.
-        #     middle_knote = (start_knote + end_knote) // 2
-        #     para_middle_knote = (para_start_knote + para_end_knote) // 2
-        #     value1 = _spline.evaluate(middle_knote)
-        #     value2 = para_spline.evaluate(para_middle_knote)
-        #     distance = abs(value1 - value2)
-        #     if distance > eps:
-        #         _spline.insert_knot(middle_knote)
-        #         para_spline.insert_knot(para_middle_knote)
-        #         _insert_knotes_recursive(start_knote,
-        #                                  middle_knote,
-        #                                  para_start_knote,
-        #                                  para_middle_knote,
-        #                                  eps)
-        #         # _insert_knotes_recursive(middle_knote,
-        #         #                          end_knote,
-        #         #                          para_middle_knote,
-        #         #                          para_end_knote,
-        #         #                          eps)
-        # for i in range(len(_spline.knots) - 1):
-        #     _insert_knotes_recursive(_spline.knots[i],
-        #                              _spline.knots[i + 1],
-        #                              para_spline.knots[i],
-        #                              para_spline.knots[i + 1],
-        #                              eps)
-        # return para_spline
+        para_points = [self._translate_point_in_spline(i, dist) for i in range(start, end)]
+        para_spline = spline.interpolate_cubic_given_knots(para_points, self.knots)
+        return para_spline
     
 
 
@@ -256,8 +226,7 @@ class spline:
         s_surface.periodic = (self.periodic, True)
         s_surface_cps = []
         for c_i in self.control_points:
-            x_i = c_i.x
-            z_i = c_i.y
+            x_i, z_i = c_i.x, c_i. y
             cps_i = []
             for j in range(num_samples):
                 cp = vec3(x_i * cos(2 * pi * j / num_samples), x_i * sin(2 * pi * j / num_samples), z_i)
@@ -267,6 +236,7 @@ class spline:
         s_surface.control_points = s_surface_cps
         s_surface.knots = (knots_spline, spline_rot.knots)
         return s_surface
+
 
 
 class spline_surface:
@@ -378,7 +348,7 @@ class spline_surface:
         ku, kv = self.knots
         nu = len(self.control_points)
         nv = len(self.control_points[0])
-        new_control_points = [[None for i in range(nv)] for j in range(nu + 1)]
+        new_control_points = [[None for _ in range(nv)] for _ in range(nu + 1)]
         for i in range(nv):
             col = [self.control_points[j][i] for j in range(nu)]
             spl = spline(du)
@@ -394,8 +364,52 @@ class spline_surface:
     # build bezier patches based on the spline with multiple knots
     # and control points sitting also as bezier points.
     def to_bezier_patches(self):
+        deg_u, deg_v = self.degree
+        knt_u, knt_v = self.knots
+        per_u, per_v = self.periodic
+        cnt_u = Counter(knt_u)
+        cnt_v = Counter(knt_v)
+
+        # periodic splines duplicate first knot at last, so ignore last
+        if per_u:
+            occ_u = list(cnt_u.items())[:-1]
+        else:
+            occ_u = cnt_u.items()
+        if per_v:
+            occ_v = list(cnt_v.items())[:-1]
+        else:
+            occ_v = cnt_v.items()
+
+        for knot_u, occ in occ_u:
+            mult = deg_u - occ
+            if mult > 0:
+                self.__insert_knot_u(knot_u, mult)
+        for knot_v, occ in occ_v:
+            mult = deg_v - occ
+            if mult > 0:
+                self.__insert_knot_v(knot_v, mult)
+
         patches = bezier_patches()
+
+        spl_outer = spline(deg_u)  # type: ignore
+        spl_outer.knots = knt_u
+        spl_outer.control_points = self.control_points
+        spl_outer.periodic = per_u
+
+        for u in list(cnt_u.keys())[:-1]:  # over interval, last already covered
+            _, inner_cpts, _ = spl_outer.get_knots_and_control(u)
+            inner_splines = []
+            for icpt in inner_cpts:
+                spline_inner = spline(deg_v, knots=knt_v, control_points=icpt, periodic=per_v)
+                inner_splines.append(spline_inner)
+
+            for v in list(cnt_v.keys())[:-1]:
+                patch = bezier_surface((deg_u, deg_v))
+                patch.control_points = [inner_splines[col].get_knots_and_control(v)[1] for col in range(deg_u + 1)]
+                patches.append(patch)
+
         return patches
+
 
 
 class knots:
@@ -439,21 +453,22 @@ class knots:
         if self.knots[0] > v or self.knots[-1] < v:
             raise ValueError("knot value out of range")
         # binary search right most index
-        l, r = 0, len(self.knots) - 1
-        while l < r:
-            m = (l + r) // 2
-            if self.knots[m] > v:
-                r = m
-            else:
-                l = m + 1
-        return r - 1
-        # invalid_index = -1
-        # if self.knots[0] > v:
-        #     return invalid_index  # unexpected!
-        # index = invalid_index
-        # for t_i in self.knots:
-        #     if t_i <= v:
-        #         index += 1
+        # l, r = 0, len(self.knots) - 1
+        # while l < r:
+        #     m = (l + r) // 2
+        #     if self.knots[m] > v:
+        #         r = m
         #     else:
-        #         return index
-        # return invalid_index
+        #         l = m + 1
+        # return r - 1
+        invalid_index = -1
+        if self.knots[0] > v:
+            return invalid_index  # unexpected!
+        index = invalid_index
+        last_value = self.knots[-1]
+        for t_i in self.knots:
+            if t_i <= v and t_i != last_value:
+                index += 1
+            else:
+                return index
+        return invalid_index
