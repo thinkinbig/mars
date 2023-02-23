@@ -16,7 +16,7 @@ s1.set_color("#0000ff")
 sc = scene_2d.scene()
 sc.set_resolution(900)
 
-for i in [-1, 1]:
+for i in range(-2, 2):
     para = s1.generate_parallel(i * 0.025, 0.005)
     para.set_color("#999999")
     sc.add_element(para)
