@@ -31,13 +31,13 @@ sc = scene_2d.scene()
 sc.set_resolution(900)
 sc.add_element(spl)
 
-surface = spl.generate_rotation_surface(6)
+num_samples = 12
+surface = spl.generate_rotation_surface(num_samples)
 
-num_samples = 6
 
-surface_degree = (spl.degree, num_samples)
-sc.write_image()
-sc.show()
+surface_degree = (spl.degree, 3)
+# sc.write_image()
+# sc.show()
 
 bezier_patches = surface.to_bezier_patches()
 

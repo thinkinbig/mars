@@ -188,15 +188,17 @@ class spline:
     # returns that spline object
     # k denotes the number of knots invertals where we can evaluate with de_boor
     def interpolate_cubic_periodic(points, k = 0):
+        assert k >= 0
+        if (k > 0):
+            points = points[-k:] + points + points[:k]
         n = len(points)
         diag1 = [1/6] * n
         diag2 = [2/3] * n
         diag3 = [1/6] * n
-
         cps = utils.solve_almost_tridiagonal_equation(diag1, diag2, diag3, points)
-        knts = knots(n +  2 * 3)
-        knts[:] = [-3, -2, -1] +  [i for i in range(n)] + [n, n + 1, n + 2]
-        cps = cps[-2:] + cps
+        knts = knots(n + 1 + 2 * 3)
+        knts[:] = [(i - 3) for i in range(n + 1 + 2 * 3)]
+        cps = cps[-3:] + cps
         return spline(degree=3, control_points=cps, knots=knts, periodic=True)
 
     def _translate_point_in_spline(self, knote, d):
@@ -249,7 +251,7 @@ class spline:
                           x_i * sin(2 * pi * j / num_samples),
                           z_i)
                 cps_i.append(cp)
-            spline_rot = spline.interpolate_cubic_periodic(cps_i)
+            spline_rot = spline.interpolate_cubic_periodic(cps_i, k = 2)
             s_surface_cps.append(spline_rot.control_points)
         s_surface.control_points = s_surface_cps
         s_surface.knots = (knots_spline, spline_rot.knots)
@@ -386,35 +388,50 @@ class spline_surface:
         knt_u, knt_v = self.knots
         per_u, per_v = self.periodic
         patches = bezier_patches()
-        occ_u = Counter(knt_u).items()
-        occ_v = Counter(knt_v).items()
+        occ_u = Counter(knt_u[deg_u:-deg_u]).items()
+        occ_v = Counter(knt_v[deg_v:-deg_v]).items()
 
 
         # insert u knots until all the knots appears deg_u times
         for knot_u, occ in occ_u:
-            mult = deg_v + 1 - occ
+            mult = deg_v - occ
             if mult > 0:
-                print("inserting knot", knot_u, "mult", mult)
                 # insert knot mult times
                 for i in range(mult):
                     self.insert_knot(self.DIR_U, knot_u)
 
         # insert v knots until all the knots appears deg_v times
         for knot_v, occ in occ_v:
-            mult = deg_u + 1 - occ
+            mult = deg_u - occ
             if mult > 0:
                 # insert knot mult times
                 for _ in range(mult):
                     self.insert_knot(self.DIR_V, knot_v)
         patches = bezier_patches()
+
+        def build_bezier_patch(u_i, v_j):
+            bs = bezier_surface((deg_u, deg_v))
+            for i in range(deg_u + 1):
+                for j in range(deg_v + 1):
+                    bs.control_points[i][j] = self.control_points[u_i + i][v_j + j]
+            return bs
         # build bezier patches
-        spl_u = spline(degree=deg_u, knots=knt_u, periodic=per_u, control_points=self.control_points)
-        for u in occ_u.keys():
-            v_cps = copy.deepcopy(spl_u.control_points)
-            spl_vs = [spline(degree=deg_v, knots=knt_v, periodic=per_v, control_points=v_cp) for v_cp in v_cps]
-        
-        for v in occ_v.keys():
-            patch = bezier_surface((deg_u, deg_v))
+        k = 2
+        if per_u:
+            foreset_u = deg_u * (k + 1) - 1 + deg_u
+            backset_u = deg_u * (k + 1) - 1 - deg_u
+        else:
+            foreset_u = 3
+            backset_u = 0
+        if per_v:
+            foreset_v = deg_v * (k + 1) - 1 + deg_v
+            backset_v = deg_v * (k + 1) - 1 - deg_v
+        else:
+            foreset_v = 3
+            backset_v = 0
+        for u_i in range(foreset_u, len(self.control_points) - deg_u - backset_u, deg_u):
+            for v_j in range(foreset_v, len(self.control_points[0]) - deg_v - backset_v, deg_v):
+                patches.append(build_bezier_patch(u_i, v_j))
         return patches
 
 

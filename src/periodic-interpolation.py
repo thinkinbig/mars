@@ -9,10 +9,7 @@ from cagd.polyline import polyline
 #returns a list of num_samples points that are uniformly distributed on the unit circle
 def unit_circle_points(num_samples):
     angle = 2 * pi / num_samples
-    p = polyline()
-    p.points = [vec2(cos(i * angle), sin(i * angle)) for i in range(num_samples)]
-    return p
-
+    return [vec2(cos(i * angle), sin(i * angle)) for i in range(num_samples)]
 #calculates the deviation between the given spline and a unit circle
 def calculate_circle_deviation(spline):
     sample_number = 888
@@ -49,9 +46,21 @@ sc.set_resolution(900)
 #generate a spline that approximates the unit circle
 n = 8
 circle_pts = unit_circle_points(n)
-circle = spline.interpolate_cubic_periodic(points=circle_pts.points)
+circle = spline.interpolate_cubic_periodic(points=circle_pts, k = 4)
+
+a, b = circle.support()
+for i in range(a, b):
+    for _ in range(circle.degree):
+        circle.insert_knot(i)
+
+
+p = polyline()
+p.points = circle_pts + [circle_pts[0]]
 sc.add_element(circle)
-sc.add_element(circle_pts)
+circle.set_color("blue")
+circle = spline.interpolate_cubic_periodic(points=circle_pts)
+sc.add_element(circle)
+sc.add_element(p)
 calculate_circle_deviation(circle)
 
 sc.write_image()
