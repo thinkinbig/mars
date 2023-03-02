@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+from math import pi, cos, sin
+import copy
 from cagd.polyline import polyline
 from cagd.spline import spline, spline_surface, knots
 from cagd.bezier import bezier_surface, bezier_patches
@@ -21,16 +23,21 @@ pts = [ vec2(0.05,5.5),
         vec2(2,-4),
         vec2(2,-4.6),]
 
+
 spl = spline.interpolate_cubic(spline.INTERPOLATION_CHORDAL, pts, knots(1))
 #you can activate these lines to view the input spline
-#spl.set_color("#0000ff")
-#sc = scene_2d.scene()
-#sc.set_resolution(900)
-#sc.add_element(spl)
-#sc.write_image()
-#sc.show()
+spl.set_color("#0000ff")
+sc = scene_2d.scene()
+sc.set_resolution(900)
+sc.add_element(spl)
 
 surface = spl.generate_rotation_surface(6)
+
+num_samples = 6
+
+surface_degree = (spl.degree, num_samples)
+sc.write_image()
+sc.show()
 
 bezier_patches = surface.to_bezier_patches()
 

@@ -90,6 +90,9 @@ class bezier_curve:
 
 
 class bezier_surface:
+    DIR_U = 0
+    DIR_V = 1
+    
     #creates a bezier surface of degrees n,m
     #the degree parameter is a tuple (n,m)
     def __init__(self, degree):
@@ -163,7 +166,30 @@ class bezier_surface:
         pass
 
     def get_derivative(self, direction):
-        pass
+        cps = self.control_points
+        d1, d2 = self.degree
+        if direction == bezier_surface.DIR_U:
+            if d1 == 0:
+                b_surface = bezier_surface((0, d2))
+                b_surface.control_points = [[cps[0][j]] for j in range(len(cps[0]))]
+                return b_surface
+            else:
+                b_surface = bezier_surface((d1 - 1, d2))
+                for i in range(len(cps)):
+                    for j in range(len(cps[i]) - 1):
+                        b_surface.control_points[i][j] = (cps[i + 1][j] - cps[i][j]) * d2
+                return b_surface
+        if direction == bezier_surface.DIR_V:
+            if d2 == 0:
+                b_surface = bezier_surface((d1, 0))
+                b_surface.control_points = [cps[i][0] for i in range(len(cps))]
+                return b_surface
+            else:
+                b_surface = bezier_surface((d1, d2 - 1))
+                for i in range(len(cps) - 1):
+                    for j in range(len(cps[i])):
+                        b_surface.control_points[i][j] = (cps[i][j + 1] - cps[i][j]) * d1
+                return b_surface
 
     def subdivide(self, t1, t2):
         b0,b1 = self.__subdivide_u(t1)
@@ -238,7 +264,57 @@ class bezier_patches:
     def visualize_curvature(self, curvature_mode, color_map):
         #calculate curvatures at each corner point
         #set colors according to color map
-        pass
+        def h(x):
+            if x < 0.25:
+                return (0, 4 * x, 1)
+            elif x < 0.5:
+                return (0, 1, 2 - 4 * x)
+            elif x < 0.75:
+                return (4 * x - 2, 1, 0)
+            else:
+                return (1, 4 - 4 * x, 0)
+        
+        def f_cut(x):
+            if x < 0:
+                return 0
+            elif x <= 1:
+                return x
+            else:
+                return 1
+        
+        def f_linear(x, k_min = 0, k_max = 1):
+            return (x - k_min) / (k_max - k_min)
+        
+        def f_classification(x):
+            if x < 0:
+                return 0
+            elif x == 0:
+                return 0.5
+            else:
+                return 1
+        if color_map == bezier_patches.COLOR_MAP_CUT:
+            func = f_cut
+        elif color_map == bezier_patches.COLOR_MAP_LINEAR:
+            func = f_linear
+        else:
+            func = f_classification
+        for patch in self.patches:
+            d1, d2 = patch.degree
+            b_u_surface = patch.get_derivative(bezier_surface.DIR_U)
+            b_v_surface = patch.get_derivative(bezier_surface.DIR_V)
+            b_uu_surface = b_u_surface.get_derivative(bezier_surface.DIR_U)
+            b_uv_surface = b_u_surface.get_derivative(bezier_surface.DIR_V)
+            b_vv_surface = b_v_surface.get_derivative(bezier_surface.DIR_V)
+            
+            b_u, b_v, b_uu, b_uv, b_vv = [], [], [], [], []
+            for i in range(2):
+                for j in range(2):
+                    b_u.append(b_u_surface.control_points[-i][-j])
+                    b_v.append(b_v_surface.control_points[-i][-j])
+                    b_uu.append(b_uu_surface.control_points[-i][-j])
+                    b_uv.append(b_uv_surface.control_points[-i][-j])
+                    b_vv.append(b_vv_surface.control_points[-i][-j])
+            
 
     def export_off(self):
         def export_point(p):

@@ -186,16 +186,18 @@ class spline:
     # generates a spline that interpolates the given points and fulfills the definition
     # of a periodic spline with equidistant knots
     # returns that spline object
-    def interpolate_cubic_periodic(points):
+    # k denotes the number of knots invertals where we can evaluate with de_boor
+    def interpolate_cubic_periodic(points, k = 0):
         n = len(points)
         diag1 = [1/6] * n
         diag2 = [2/3] * n
         diag3 = [1/6] * n
+
         cps = utils.solve_almost_tridiagonal_equation(diag1, diag2, diag3, points)
-        knts = [i for i in range(n)]
-        knoten = knots(len(knts))
-        knoten[:] = knts
-        return spline(degree=3, control_points=cps, knots=knoten, periodic=True)
+        knts = knots(n +  2 * 3)
+        knts[:] = [-3, -2, -1] +  [i for i in range(n)] + [n, n + 1, n + 2]
+        cps = cps[-2:] + cps
+        return spline(degree=3, control_points=cps, knots=knts, periodic=True)
 
     def _translate_point_in_spline(self, knote, d):
         p_i = self(knote)
@@ -234,17 +236,18 @@ class spline:
     # num_samples refers to the number of interpolation points in the rotational direction
     # returns a spline surface object in three dimensions
     def generate_rotation_surface(self, num_samples):
-        surface_degree = (self.degree, self.degree)
+        surface_degree = (self.degree, 3)
         s_surface = spline_surface(surface_degree)
         knots_spline = copy.deepcopy(self.knots)
-        knot_dist = math.pi / num_samples
-        s_surface.periodic = (self.periodic, self.periodic)
+        s_surface.periodic = (self.periodic, True)
         s_surface_cps = []
         for c_i in self.control_points:
-            x_i, z_i = c_i.x, c_i. y
+            x_i, z_i = c_i.x, c_i.y
             cps_i = []
             for j in range(num_samples):
-                cp = vec3(x_i * cos(2 * pi * j / num_samples), x_i * sin(2 * pi * j / num_samples), z_i)
+                cp = vec3(x_i * cos(2 * pi * j / num_samples),
+                          x_i * sin(2 * pi * j / num_samples),
+                          z_i)
                 cps_i.append(cp)
             spline_rot = spline.interpolate_cubic_periodic(cps_i)
             s_surface_cps.append(spline_rot.control_points)
@@ -383,47 +386,35 @@ class spline_surface:
         knt_u, knt_v = self.knots
         per_u, per_v = self.periodic
         patches = bezier_patches()
-        cnt_u = Counter(knt_u)
-        cnt_v = Counter(knt_v)
+        occ_u = Counter(knt_u).items()
+        occ_v = Counter(knt_v).items()
 
-        # periodic splines duplicate first knot at last, so ignore last
-        if per_u:
-            occ_u = list(cnt_u.items())[:-1]
-        else:
-            occ_u = cnt_u.items()
-        if per_v:
-            occ_v = list(cnt_v.items())[:-1]
-        else:
-            occ_v = cnt_v.items()
 
         # insert u knots until all the knots appears deg_u times
         for knot_u, occ in occ_u:
-            mult = occ - deg_u
+            mult = deg_v + 1 - occ
             if mult > 0:
+                print("inserting knot", knot_u, "mult", mult)
                 # insert knot mult times
-                for _ in range(mult):
+                for i in range(mult):
                     self.insert_knot(self.DIR_U, knot_u)
 
         # insert v knots until all the knots appears deg_v times
         for knot_v, occ in occ_v:
-            mult = occ - deg_v
+            mult = deg_u + 1 - occ
             if mult > 0:
                 # insert knot mult times
                 for _ in range(mult):
                     self.insert_knot(self.DIR_V, knot_v)
         patches = bezier_patches()
-        spl_u = spline(deg_u, knots=knt_u, control_points=self.control_points, periodic=per_u)
-        for _ in list(cnt_u.keys())[:-1]:
-            spl_v_cps = copy.deepcopy(spl_u.control_points)
-            v_splines = []
-            for v_cps in spl_v_cps:
-                v_spline = spline(deg_v, knots=knt_v, control_points=v_cps, periodic=per_v)
-                v_splines.append(v_spline)
-            for _ in list(cnt_v.keys())[:-1]:
-                patch = bezier_surface((deg_u, deg_v))
-                patch_cps = [copy.deepcopy(v_splines[col].control_points) for col in range(len(v_splines))]
-                patch.control_points = patch_cps
-                patches.append(patch)
+        # build bezier patches
+        spl_u = spline(degree=deg_u, knots=knt_u, periodic=per_u, control_points=self.control_points)
+        for u in occ_u.keys():
+            v_cps = copy.deepcopy(spl_u.control_points)
+            spl_vs = [spline(degree=deg_v, knots=knt_v, periodic=per_v, control_points=v_cp) for v_cp in v_cps]
+        
+        for v in occ_v.keys():
+            patch = bezier_surface((deg_u, deg_v))
         return patches
 
 
@@ -469,15 +460,6 @@ class knots:
     def knot_index(self, v, start, end):
         if self.knots[0] > v or self.knots[-1] < v:
             raise ValueError("knot value out of range")
-        # binary search right most index
-        # l, r = 0, len(self.knots) - 1
-        # while l < r:
-        #     m = (l + r) // 2
-        #     if self.knots[m] > v:
-        #         r = m
-        #     else:
-        #         l = m + 1
-        # return r - 1
         invalid_index = -1
         index = invalid_index
         for i in range(len(self.knots)):
