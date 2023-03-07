@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import math
 from cagd.vec import vec2, vec3
 from cagd.polyline import polyline
 import copy
@@ -32,8 +33,8 @@ class bezier_curve:
 
     #calculates the normal at t
     def normal(self, t):
-        pass
-
+        return self.tangent(t).normalize()
+    
     #syntactic sugar so bezier curve can be evaluated as curve(t)
     #instead of curve.evaluate(t)
     def __call__(self, t):
@@ -58,7 +59,13 @@ class bezier_curve:
 
     #calculates the bezier representation of the derivative
     def get_derivative(self):
-        pass
+        d1 = self.degree
+        if (d1 == 0):
+            return 0
+        b_c = bezier_curve(d1 - 1)
+        for i in range(d1):
+            b_c.set_control_point(i, d1 * (self.control_points[i + 1] - self.control_points[i]))
+        return b_c
 
     def get_axis_aligned_bounding_box(self):
         min_vec = copy.copy(self.control_points[0])
@@ -92,7 +99,7 @@ class bezier_curve:
 class bezier_surface:
     DIR_U = 0
     DIR_V = 1
-    
+
     #creates a bezier surface of degrees n,m
     #the degree parameter is a tuple (n,m)
     def __init__(self, degree):
@@ -163,33 +170,25 @@ class bezier_surface:
         return column
 
     def normal(self, t1, t2):
-        pass
+        return t1.cross(t2).normalize()
 
     def get_derivative(self, direction):
         cps = self.control_points
         d1, d2 = self.degree
         if direction == bezier_surface.DIR_U:
-            if d1 == 0:
-                b_surface = bezier_surface((0, d2))
-                b_surface.control_points = [[cps[0][j]] for j in range(len(cps[0]))]
-                return b_surface
-            else:
-                b_surface = bezier_surface((d1 - 1, d2))
-                for i in range(len(cps)):
-                    for j in range(len(cps[i]) - 1):
-                        b_surface.control_points[i][j] = (cps[i + 1][j] - cps[i][j]) * d2
-                return b_surface
-        if direction == bezier_surface.DIR_V:
-            if d2 == 0:
-                b_surface = bezier_surface((d1, 0))
-                b_surface.control_points = [cps[i][0] for i in range(len(cps))]
-                return b_surface
-            else:
-                b_surface = bezier_surface((d1, d2 - 1))
-                for i in range(len(cps) - 1):
-                    for j in range(len(cps[i])):
-                        b_surface.control_points[i][j] = (cps[i][j + 1] - cps[i][j]) * d1
-                return b_surface
+            b_u = bezier_surface((d1 - 1, d2))
+            for i in range(d1):
+                for j in range(d2 + 1):
+                    b_u.control_points[i][j] = (d1) * (cps[i + 1][j] - cps[i][j])
+            return b_u
+        elif direction == bezier_surface.DIR_V:
+            b_v = bezier_surface((d1, d2 - 1))
+            for i in range(d1 + 1):
+                for j in range(d2):
+                    b_v.control_points[i][j] = (d2) * (cps[i][j + 1] - cps[i][j])
+            return b_v
+        else:
+            raise ValueError("invalid direction")
 
     def subdivide(self, t1, t2):
         b0,b1 = self.__subdivide_u(t1)
@@ -217,7 +216,6 @@ class bezier_surface:
                 left.control_points[i][k] = pts[i][0]
                 right.control_points[i][-(k+1)] = pts[i][-1]
         return (left, right)
-        
 
 
 class bezier_patches:
@@ -260,11 +258,53 @@ class bezier_patches:
                 for n in new:
                     new_patches.append(n)
             self.patches = new_patches
+    
+    
+    def get_derivative(self, patch):
+        d1, d2 = patch.degree
+        b_u_surface = patch.get_derivative(bezier_surface.DIR_U)
+        b_v_surface = patch.get_derivative(bezier_surface.DIR_V)
+        b_uu_surface = b_u_surface.get_derivative(bezier_surface.DIR_U)
+        b_uv_surface = b_u_surface.get_derivative(bezier_surface.DIR_V)
+        b_vv_surface = b_v_surface.get_derivative(bezier_surface.DIR_V)
+        b_u, b_v, b_uu, b_uv, b_vv = [], [], [], [], []
+        for i in range(2):
+            for j in range(2):
+                b_u.append(b_u_surface.control_points[-i][-j])
+                b_v.append(b_v_surface.control_points[-i][-j])
+                b_uu.append(b_uu_surface.control_points[-i][-j])
+                b_uv.append(b_uv_surface.control_points[-i][-j])
+                b_vv.append(b_vv_surface.control_points[-i][-j])
+        return b_u, b_v, b_uu, b_uv, b_vv
+
+    def gauss_and_middle_curvature(self, patch):
+        K, H = [], []
+        b_u, b_v, b_uu, b_uv, b_vv = self.get_derivative(patch)
+        for i in range(4):
+            print(b_u[i], b_v[i])
+            normal = patch.normal(b_u[i], b_v[i])
+            E = b_u[i].dot(b_u[i])
+            F = b_u[i].dot(b_v[i])
+            G = b_v[i].dot(b_v[i])
+
+            e = b_uu[i].dot(normal)
+            f = b_uv[i].dot(normal)
+            g = b_vv[i].dot(normal)
+            K.append((e * g - f ** 2) / (E * G - F ** 2))
+            H.append((e * G + g * E - 2 * f * F) / ((E * G - F ** 2) * 2))
+        return K, H
+
+    def main_curvature(self, K, H):
+        K_max, K_min = [], []
+        for i in range(4):
+            K_max.append(H[i] + math.sqrt(H[i] ** 2 - K[i]))
+            K_min.append(H[i] - math.sqrt(H[i] ** 2 - K[i]))
+        return K_max, K_min
 
     def visualize_curvature(self, curvature_mode, color_map):
         #calculate curvatures at each corner point
         #set colors according to color map
-        def h(x):
+        def h(x, K, H , K_max, K_min):
             if x < 0.25:
                 return (0, 4 * x, 1)
             elif x < 0.5:
@@ -273,19 +313,23 @@ class bezier_patches:
                 return (4 * x - 2, 1, 0)
             else:
                 return (1, 4 - 4 * x, 0)
-        
-        def f_cut(x):
+        def f_cut(x, K, H, K_max, K_min):
             if x < 0:
                 return 0
             elif x <= 1:
                 return x
             else:
                 return 1
-        
-        def f_linear(x, k_min = 0, k_max = 1):
-            return (x - k_min) / (k_max - k_min)
-        
-        def f_classification(x):
+        def f_linear(x, K, H, K_max, K_min):
+            res = []
+            for i in range(4):
+                k0, h0, k_max, k_min = K[i], H[i], K_max[i], K_min[i]
+                # find the maximum and minimum curvature
+                max_curvature = max(k0, h0, k_max, k_min)
+                min_curvature = min(k0, h0, k_max, k_min)
+                res.append((x - min_curvature) / (max_curvature - min_curvature))
+            return res
+        def f_classification(x, K, H, K_max, K_min):
             if x < 0:
                 return 0
             elif x == 0:
@@ -299,23 +343,20 @@ class bezier_patches:
         else:
             func = f_classification
         for patch in self.patches:
-            d1, d2 = patch.degree
-            b_u_surface = patch.get_derivative(bezier_surface.DIR_U)
-            b_v_surface = patch.get_derivative(bezier_surface.DIR_V)
-            b_uu_surface = b_u_surface.get_derivative(bezier_surface.DIR_U)
-            b_uv_surface = b_u_surface.get_derivative(bezier_surface.DIR_V)
-            b_vv_surface = b_v_surface.get_derivative(bezier_surface.DIR_V)
-            
-            b_u, b_v, b_uu, b_uv, b_vv = [], [], [], [], []
-            for i in range(2):
-                for j in range(2):
-                    b_u.append(b_u_surface.control_points[-i][-j])
-                    b_v.append(b_v_surface.control_points[-i][-j])
-                    b_uu.append(b_uu_surface.control_points[-i][-j])
-                    b_uv.append(b_uv_surface.control_points[-i][-j])
-                    b_vv.append(b_vv_surface.control_points[-i][-j])
-            
-
+            K, H = self.gauss_and_middle_curvature(patch)
+            K_max, K_min = self.main_curvature(K, H)
+            if curvature_mode == bezier_patches.CURVATURE_GAUSSIAN:
+                curvature = K
+            elif curvature_mode == bezier_patches.CURVATURE_AVERAGE:
+                curvature = H
+            elif curvature_mode == bezier_patches.CURVATURE_PRINCIPAL_MAX:
+                curvature = K_max
+            elif curvature_mode == bezier_patches.CURVATURE_PRINCIPAL_MIN:
+                curvature = K_min
+            else:
+                raise ValueError("Invalid curvature mode")
+            patch.set_curvature(*curvature)
+            patch.set_colors(*[h(func(x, K, H, K_max, K_min)) for x in curvature])
     def export_off(self):
         def export_point(p):
             return str(p.x) + " " + str(p.y) + " " + str(p.z)

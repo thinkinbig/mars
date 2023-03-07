@@ -36,8 +36,8 @@ surface = spl.generate_rotation_surface(num_samples)
 
 
 surface_degree = (spl.degree, 3)
-# sc.write_image()
-# sc.show()
+sc.write_image()
+sc.show()
 
 bezier_patches = surface.to_bezier_patches()
 

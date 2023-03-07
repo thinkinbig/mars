@@ -35,6 +35,13 @@ class vec3:
 
     def dot(self, other):
         return self.x * other.x + self.y * other.y + self.z * other.z
+    
+    def cross(self, other):
+        return vec3(self.y * other.z - self.z * other.y, self.z * other.x - self.x * other.z, self.x * other.y - self.y * other.x)
+
+    def normalize(self):
+        assert abs(self) != 0
+        return vec3(self.x / abs(self), self.y / abs(self), self.z / abs(self))
 
     def __abs__(self):
         return math.sqrt(self.dot(self))
@@ -43,7 +50,7 @@ class vec3:
         return hash((self.x, self.y, self.z))
 
     def __copy__(self):
-        return vec2(self.x, self.y, self.z)
+        return vec3(self.x, self.y, self.z)
 
 
 class vec2:
@@ -51,8 +58,6 @@ class vec2:
         self.x = a
         self.y = b
     
-    
-    @staticmethod
     def zero():
         return vec2(0,0)
     
@@ -88,6 +93,12 @@ class vec2:
 
     def dot(self, other):
         return self.x * other.x + self.y * other.y
+    
+    def cross(self, other):
+        return self.x * other.y - self.y * other.x
+    
+    def normalize(self):
+        return vec2(self.x / abs(self), self.y / abs(self))
 
     def __abs__(self):
         return math.sqrt(self.dot(self))
